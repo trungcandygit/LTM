@@ -1,25 +1,33 @@
 #!/bin/bash
-# Script chay News Manager UDP Backend
+# Script chay News Manager - MySQL Backend
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+JAR="lib/mysql-connector-j-8.3.0.jar"
+
+if [ ! -f "$JAR" ]; then
+    echo "[ERROR] Khong tim thay $JAR"
+    echo "        Tai ve: https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.3.0/mysql-connector-j-8.3.0.jar"
+    exit 1
+fi
+
 echo "=== Bien dich Java sources ==="
-javac TinTuc.java TheLoaiTin.java UDPServer.java HttpBridge.java
+javac -cp "$JAR" TinTuc.java TheLoaiTin.java UDPServer.java HttpBridge.java
 
 echo "=== Dung cac process cu (neu co) ==="
-pkill -f "UDPServer" 2>/dev/null || true
-pkill -f "HttpBridge" 2>/dev/null || true
+kill $(pgrep -f "UDPServer") 2>/dev/null || true
+kill $(pgrep -f "HttpBridge") 2>/dev/null || true
 sleep 1
 
 echo "=== Khoi dong UDPServer (port 9999) ==="
-java UDPServer &
+java -cp ".:$JAR" UDPServer &
 UDP_PID=$!
-sleep 1
+sleep 2
 
 echo "=== Khoi dong HttpBridge (port 8080) ==="
-java HttpBridge &
+java -cp ".:$JAR" HttpBridge &
 HTTP_PID=$!
 sleep 1
 
@@ -27,13 +35,13 @@ echo ""
 echo "====================================="
 echo "  NewsManager Backend da chay!"
 echo "====================================="
-echo "  UDP Server : localhost:9999 (PID $UDP_PID)"
+echo "  Database : MySQL news_manager"
+echo "  UDP Server : localhost:9999  (PID $UDP_PID)"
 echo "  HTTP Bridge: http://localhost:8080  (PID $HTTP_PID)"
 echo "====================================="
 echo ""
-echo "Mo trinh duyet va vao: news-manager/index.html"
-echo "Nhan Ctrl+C de dung servers"
+echo "Mo index.html trong trinh duyet"
+echo "Nhan Ctrl+C de dung"
 echo ""
 
-# Wait for both
 wait $UDP_PID $HTTP_PID

@@ -1,178 +1,229 @@
 import java.net.*;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.sql.*;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UDPServer {
     static final int PORT = 9999;
-    static final int BUFFER_SIZE = 65507;
 
-    static Map<String, TheLoaiTin> dsLoai = new ConcurrentHashMap<>();
-    static Map<Integer, TinTuc> dsTin = new ConcurrentHashMap<>();
-    static AtomicInteger nextMaTin = new AtomicInteger(9);
+    // === CAU HINH KET NOI MYSQL ===
+    static final String DB_URL  = "jdbc:mysql://localhost:3306/news_manager?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8";
+    static final String DB_USER = "root";
+    static final String DB_PASS = "";   // Mac dinh XAMPP khong co mat khau
 
     public static void main(String[] args) throws Exception {
-        khoiTaoDuLieuMau();
+        // Kiem tra ket noi truoc khi lang nghe
+        try (Connection c = getConn()) {
+            System.out.println("[UDPServer] Ket noi MySQL thanh cong!");
+        } catch (SQLException e) {
+            System.err.println("[UDPServer] LOI ket noi MySQL: " + e.getMessage());
+            System.err.println("  -> Hay chay MySQL: net start mysql  (hoac bat XAMPP MySQL service)");
+            System.err.println("  -> Hay chay SQL:   mysql -u root < news_manager.sql");
+            System.exit(1);
+        }
+
         DatagramSocket socket = new DatagramSocket(PORT);
-        System.out.println("[UDPServer] Dang lang nghe tren port " + PORT);
-        byte[] buf = new byte[BUFFER_SIZE];
+        System.out.println("[UDPServer] Dang lang nghe UDP tren port " + PORT);
+
+        byte[] buf = new byte[65507];
         while (true) {
-            DatagramPacket packet = new DatagramPacket(buf, buf.length);
-            socket.receive(packet);
-            String msg = new String(packet.getData(), 0, packet.getLength(), "UTF-8").trim();
-            String response = xuLyLenh(msg);
-            byte[] respBytes = response.getBytes("UTF-8");
-            DatagramPacket resp = new DatagramPacket(respBytes, respBytes.length,
-                    packet.getAddress(), packet.getPort());
-            socket.send(resp);
+            DatagramPacket pkt = new DatagramPacket(buf, buf.length);
+            socket.receive(pkt);
+            String msg = new String(pkt.getData(), 0, pkt.getLength(), "UTF-8").trim();
+            String resp = xuLyLenh(msg);
+            byte[] rb = resp.getBytes("UTF-8");
+            socket.send(new DatagramPacket(rb, rb.length, pkt.getAddress(), pkt.getPort()));
         }
     }
 
-    static void khoiTaoDuLieuMau() {
-        dsLoai.put("CN", new TheLoaiTin("CN", "Cong nghe", "laptop", "blue"));
-        dsLoai.put("TT", new TheLoaiTin("TT", "The thao", "ball-football", "green"));
-        dsLoai.put("KT", new TheLoaiTin("KT", "Kinh te", "trending-up", "yellow"));
-        dsLoai.put("GT", new TheLoaiTin("GT", "Giai tri", "device-tv", "red"));
-
-        dsTin.put(1, new TinTuc(1, "AI tao ra dot pha moi trong y te", "Cac nha khoa hoc su dung AI de chan doan benh sow mai hieu qua hon.", "https://picsum.photos/seed/ai1/400/200", "2026-05-01", "CN"));
-        dsTin.put(2, new TinTuc(2, "ChatGPT cap nhat phien ban 5.0", "OpenAI chinh thuc ra mat ChatGPT 5.0 voi nhieu tinh nang vuot troi.", "https://picsum.photos/seed/ai2/400/200", "2026-05-02", "CN"));
-        dsTin.put(3, new TinTuc(3, "Viet Nam vo dich SEA Games bong da", "Doi tuyen Viet Nam gianh huy chuong vang tai SEA Games 35.", "https://picsum.photos/seed/sport1/400/200", "2026-05-01", "TT"));
-        dsTin.put(4, new TinTuc(4, "Giai Ngoai hang Anh vao hoi ket", "Manchester City dan dau bang xep hang voi 5 vong dau con lai.", "https://picsum.photos/seed/sport2/400/200", "2026-05-03", "TT"));
-        dsTin.put(5, new TinTuc(5, "Lam phat giam xuong 2.1% trong thang 4", "Ngan hang nha nuoc cong bo bao cao lam phat thang 4 giam manh.", "https://picsum.photos/seed/eco1/400/200", "2026-05-02", "KT"));
-        dsTin.put(6, new TinTuc(6, "Chung khoan tang manh, VN-Index vuot 1500", "Thi truong chung khoan Viet Nam ghi nhan phien tang an tuong.", "https://picsum.photos/seed/eco2/400/200", "2026-05-04", "KT"));
-        dsTin.put(7, new TinTuc(7, "Phim bom tan Marvel cong pha phong ve", "Avengers Secret Wars thu ve 200 trieu USD trong ngay dau cong chieu.", "https://picsum.photos/seed/ent1/400/200", "2026-05-03", "GT"));
-        dsTin.put(8, new TinTuc(8, "Ca si V-Pop vua len top Billboard", "Mot nghe si tre Viet Nam lan dau len duoc top 50 Billboard.", "https://picsum.photos/seed/ent2/400/200", "2026-05-05", "GT"));
+    static Connection getConn() throws SQLException {
+        return DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
     }
 
     static String xuLyLenh(String lenh) {
-        String[] parts = lenh.split("\\|", -1);
-        String cmd = parts[0].trim();
-
+        String[] p = lenh.split("\\|", -1);
+        String cmd = p[0].trim();
         try {
             switch (cmd) {
-                case "GET_LOAI": return getLoai();
-                case "THEM_LOAI": return themLoai(parts);
-                case "SUA_LOAI": return suaLoai(parts);
-                case "XOA_LOAI": return xoaLoai(parts);
-                case "GET_TIN": return getTin();
-                case "GET_TIN_THEO_LOAI": return getTinTheoLoai(parts);
-                case "GET_TIN_THEO_NGAY": return getTinTheoNgay(parts);
-                case "THEM_TIN": return themTin(parts);
-                case "SUA_TIN": return suaTin(parts);
-                case "XOA_TIN": return xoaTin(parts);
+                case "GET_LOAI":            return getLoai();
+                case "THEM_LOAI":           return themLoai(p);
+                case "SUA_LOAI":            return suaLoai(p);
+                case "XOA_LOAI":            return xoaLoai(p);
+                case "GET_TIN":             return getTin(null, null);
+                case "GET_TIN_THEO_LOAI":   return getTin(p.length>1 ? p[1].trim() : null, null);
+                case "GET_TIN_THEO_NGAY":   return getTin(null, p.length>1 ? p[1].trim() : null);
+                case "THEM_TIN":            return themTin(p);
+                case "SUA_TIN":             return suaTin(p);
+                case "XOA_TIN":             return xoaTin(p);
                 default: return "{\"error\":\"Lenh khong hop le\"}";
             }
         } catch (Exception e) {
-            return "{\"error\":\"" + e.getMessage() + "\"}";
+            return "{\"error\":\"" + escJson(e.getMessage()) + "\"}";
         }
     }
 
-    static String getLoai() {
-        String json = dsLoai.values().stream()
-            .map(l -> l.toJson())
-            .collect(Collectors.joining(",", "[", "]"));
-        return json;
+    // ---- THE LOAI ----
+
+    static String getLoai() throws SQLException {
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(
+                 "SELECT ma, ten, icon, mau_badge FROM the_loai ORDER BY ma");
+             ResultSet rs = ps.executeQuery()) {
+            List<String> list = new ArrayList<>();
+            while (rs.next()) list.add(loaiToJson(rs));
+            return "[" + String.join(",", list) + "]";
+        }
     }
 
-    static String themLoai(String[] parts) {
-        if (parts.length < 4) return "{\"error\":\"Thieu tham so\"}";
-        String ma = parts[1].trim();
-        String ten = parts[2].trim();
-        String icon = parts[3].trim();
-        String mau = parts.length > 4 ? parts[4].trim() : "blue";
-        if (dsLoai.containsKey(ma)) return "{\"error\":\"Ma loai da ton tai\"}";
-        TheLoaiTin loai = new TheLoaiTin(ma, ten, icon, mau);
-        dsLoai.put(ma, loai);
-        return loai.toJson();
+    static String themLoai(String[] p) throws SQLException {
+        if (p.length < 4) return "{\"error\":\"Thieu tham so\"}";
+        String ma = p[1].trim(), ten = p[2].trim(),
+               icon = p[3].trim(), mau = p.length > 4 ? p[4].trim() : "blue";
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(
+                 "INSERT INTO the_loai(ma,ten,icon,mau_badge) VALUES(?,?,?,?)")) {
+            ps.setString(1, ma); ps.setString(2, ten);
+            ps.setString(3, icon); ps.setString(4, mau);
+            ps.executeUpdate();
+        }
+        return loaiJsonRaw(ma, ten, icon, mau);
     }
 
-    static String suaLoai(String[] parts) {
-        if (parts.length < 3) return "{\"error\":\"Thieu tham so\"}";
-        String ma = parts[1].trim();
-        String ten = parts[2].trim();
-        String icon = parts.length > 3 ? parts[3].trim() : "";
-        String mau = parts.length > 4 ? parts[4].trim() : "blue";
-        TheLoaiTin loai = dsLoai.get(ma);
-        if (loai == null) return "{\"error\":\"Khong tim thay the loai\"}";
-        loai.ten = ten;
-        if (!icon.isEmpty()) loai.icon = icon;
-        if (!mau.isEmpty()) loai.mauBadge = mau;
-        dsLoai.put(ma, loai);
-        return loai.toJson();
+    static String suaLoai(String[] p) throws SQLException {
+        if (p.length < 3) return "{\"error\":\"Thieu tham so\"}";
+        String ma = p[1].trim(), ten = p[2].trim(),
+               icon = p.length > 3 ? p[3].trim() : "tag",
+               mau  = p.length > 4 ? p[4].trim() : "blue";
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(
+                 "UPDATE the_loai SET ten=?,icon=?,mau_badge=? WHERE ma=?")) {
+            ps.setString(1, ten); ps.setString(2, icon);
+            ps.setString(3, mau); ps.setString(4, ma);
+            if (ps.executeUpdate() == 0) return "{\"error\":\"Khong tim thay the loai\"}";
+        }
+        return loaiJsonRaw(ma, ten, icon, mau);
     }
 
-    static String xoaLoai(String[] parts) {
-        if (parts.length < 2) return "{\"error\":\"Thieu tham so\"}";
-        String ma = parts[1].trim();
-        boolean conTin = dsTin.values().stream().anyMatch(t -> ma.equals(t.maLoai));
-        if (conTin) return "{\"error\":\"Con tin thuoc loai nay, khong the xoa\"}";
-        TheLoaiTin removed = dsLoai.remove(ma);
-        if (removed == null) return "{\"error\":\"Khong tim thay the loai\"}";
-        return "{\"success\":true,\"ma\":\"" + ma + "\"}";
+    static String xoaLoai(String[] p) throws SQLException {
+        if (p.length < 2) return "{\"error\":\"Thieu tham so\"}";
+        String ma = p[1].trim();
+        // Kiem tra con tin khong — MySQL foreign key se chặn nhung ta bắt lỗi dep hon
+        try (Connection c = getConn()) {
+            try (PreparedStatement chk = c.prepareStatement(
+                    "SELECT COUNT(*) FROM tin_tuc WHERE ma_loai=?")) {
+                chk.setString(1, ma);
+                ResultSet rs = chk.executeQuery();
+                rs.next();
+                if (rs.getInt(1) > 0)
+                    return "{\"error\":\"Con tin thuoc loai nay, khong the xoa\"}";
+            }
+            try (PreparedStatement del = c.prepareStatement(
+                    "DELETE FROM the_loai WHERE ma=?")) {
+                del.setString(1, ma);
+                if (del.executeUpdate() == 0) return "{\"error\":\"Khong tim thay the loai\"}";
+            }
+        }
+        return "{\"success\":true,\"ma\":\"" + escJson(ma) + "\"}";
     }
 
-    static String getTin() {
-        String json = dsTin.values().stream()
-            .sorted(Comparator.comparing((TinTuc t) -> t.ngayDang).reversed())
-            .map(t -> t.toJson())
-            .collect(Collectors.joining(",", "[", "]"));
-        return json;
+    // ---- TIN TUC ----
+
+    static String getTin(String maLoai, String ngay) throws SQLException {
+        StringBuilder sql = new StringBuilder(
+            "SELECT ma,tieu_de,noi_dung,link_anh,ngay_dang,ma_loai FROM tin_tuc WHERE 1=1");
+        if (maLoai != null && !maLoai.isEmpty()) sql.append(" AND ma_loai=?");
+        if (ngay    != null && !ngay.isEmpty())   sql.append(" AND ngay_dang=?");
+        sql.append(" ORDER BY ngay_dang DESC, ma DESC");
+
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(sql.toString())) {
+            int idx = 1;
+            if (maLoai != null && !maLoai.isEmpty()) ps.setString(idx++, maLoai);
+            if (ngay   != null && !ngay.isEmpty())   ps.setString(idx,   ngay);
+            ResultSet rs = ps.executeQuery();
+            List<String> list = new ArrayList<>();
+            while (rs.next()) list.add(tinToJson(rs));
+            return "[" + String.join(",", list) + "]";
+        }
     }
 
-    static String getTinTheoLoai(String[] parts) {
-        if (parts.length < 2) return "{\"error\":\"Thieu tham so\"}";
-        String maLoai = parts[1].trim();
-        String json = dsTin.values().stream()
-            .filter(t -> maLoai.equals(t.maLoai))
-            .sorted(Comparator.comparing((TinTuc t) -> t.ngayDang).reversed())
-            .map(t -> t.toJson())
-            .collect(Collectors.joining(",", "[", "]"));
-        return json;
+    static String themTin(String[] p) throws SQLException {
+        if (p.length < 6) return "{\"error\":\"Thieu tham so\"}";
+        String tieuDe=p[1].trim(), noiDung=p[2].trim(),
+               linkAnh=p[3].trim(), ngayDang=p[4].trim(), maLoai=p[5].trim();
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(
+                 "INSERT INTO tin_tuc(tieu_de,noi_dung,link_anh,ngay_dang,ma_loai) VALUES(?,?,?,?,?)",
+                 Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1,tieuDe); ps.setString(2,noiDung);
+            ps.setString(3,linkAnh); ps.setString(4,ngayDang); ps.setString(5,maLoai);
+            ps.executeUpdate();
+            ResultSet gk = ps.getGeneratedKeys();
+            gk.next();
+            int newMa = gk.getInt(1);
+            return tinJsonRaw(newMa, tieuDe, noiDung, linkAnh, ngayDang, maLoai);
+        }
     }
 
-    static String getTinTheoNgay(String[] parts) {
-        if (parts.length < 2) return "{\"error\":\"Thieu tham so\"}";
-        String ngay = parts[1].trim();
-        String json = dsTin.values().stream()
-            .filter(t -> ngay.equals(t.ngayDang))
-            .map(t -> t.toJson())
-            .collect(Collectors.joining(",", "[", "]"));
-        return json;
-    }
-
-    static String themTin(String[] parts) {
-        if (parts.length < 6) return "{\"error\":\"Thieu tham so\"}";
-        int ma = nextMaTin.getAndIncrement();
-        TinTuc tin = new TinTuc(ma, parts[1].trim(), parts[2].trim(),
-                parts[3].trim(), parts[4].trim(), parts[5].trim());
-        dsTin.put(ma, tin);
-        return tin.toJson();
-    }
-
-    static String suaTin(String[] parts) {
-        if (parts.length < 7) return "{\"error\":\"Thieu tham so\"}";
+    static String suaTin(String[] p) throws SQLException {
+        if (p.length < 7) return "{\"error\":\"Thieu tham so\"}";
         int ma;
-        try { ma = Integer.parseInt(parts[1].trim()); }
+        try { ma = Integer.parseInt(p[1].trim()); }
         catch (NumberFormatException e) { return "{\"error\":\"Ma tin khong hop le\"}"; }
-        TinTuc tin = dsTin.get(ma);
-        if (tin == null) return "{\"error\":\"Khong tim thay tin tuc\"}";
-        tin.tieuDe = parts[2].trim();
-        tin.noiDung = parts[3].trim();
-        tin.linkAnh = parts[4].trim();
-        tin.ngayDang = parts[5].trim();
-        tin.maLoai = parts[6].trim();
-        dsTin.put(ma, tin);
-        return tin.toJson();
+        String tieuDe=p[2].trim(), noiDung=p[3].trim(),
+               linkAnh=p[4].trim(), ngayDang=p[5].trim(), maLoai=p[6].trim();
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(
+                 "UPDATE tin_tuc SET tieu_de=?,noi_dung=?,link_anh=?,ngay_dang=?,ma_loai=? WHERE ma=?")) {
+            ps.setString(1,tieuDe); ps.setString(2,noiDung); ps.setString(3,linkAnh);
+            ps.setString(4,ngayDang); ps.setString(5,maLoai); ps.setInt(6,ma);
+            if (ps.executeUpdate() == 0) return "{\"error\":\"Khong tim thay tin tuc\"}";
+        }
+        return tinJsonRaw(ma, tieuDe, noiDung, linkAnh, ngayDang, maLoai);
     }
 
-    static String xoaTin(String[] parts) {
-        if (parts.length < 2) return "{\"error\":\"Thieu tham so\"}";
+    static String xoaTin(String[] p) throws SQLException {
+        if (p.length < 2) return "{\"error\":\"Thieu tham so\"}";
         int ma;
-        try { ma = Integer.parseInt(parts[1].trim()); }
+        try { ma = Integer.parseInt(p[1].trim()); }
         catch (NumberFormatException e) { return "{\"error\":\"Ma tin khong hop le\"}"; }
-        TinTuc removed = dsTin.remove(ma);
-        if (removed == null) return "{\"error\":\"Khong tim thay tin tuc\"}";
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement("DELETE FROM tin_tuc WHERE ma=?")) {
+            ps.setInt(1, ma);
+            if (ps.executeUpdate() == 0) return "{\"error\":\"Khong tim thay tin tuc\"}";
+        }
         return "{\"success\":true,\"ma\":" + ma + "}";
+    }
+
+    // ---- Helpers ----
+
+    static String loaiToJson(ResultSet rs) throws SQLException {
+        return loaiJsonRaw(rs.getString("ma"), rs.getString("ten"),
+                           rs.getString("icon"), rs.getString("mau_badge"));
+    }
+
+    static String loaiJsonRaw(String ma, String ten, String icon, String mau) {
+        return "{\"ma\":\""+escJson(ma)+"\",\"ten\":\""+escJson(ten)+
+               "\",\"icon\":\""+escJson(icon)+"\",\"mauBadge\":\""+escJson(mau)+"\"}";
+    }
+
+    static String tinToJson(ResultSet rs) throws SQLException {
+        return tinJsonRaw(rs.getInt("ma"), rs.getString("tieu_de"),
+                rs.getString("noi_dung"), rs.getString("link_anh"),
+                rs.getString("ngay_dang"), rs.getString("ma_loai"));
+    }
+
+    static String tinJsonRaw(int ma, String tieuDe, String noiDung,
+                              String linkAnh, String ngayDang, String maLoai) {
+        return "{\"ma\":"+ma+",\"tieuDe\":\""+escJson(tieuDe)+"\",\"noiDung\":\""+
+               escJson(noiDung)+"\",\"linkAnh\":\""+escJson(linkAnh)+"\",\"ngayDang\":\""+
+               escJson(ngayDang)+"\",\"maLoai\":\""+escJson(maLoai)+"\"}";
+    }
+
+    static String escJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\","\\\\").replace("\"","\\\"")
+                .replace("\n","\\n").replace("\r","\\r").replace("\t","\\t");
     }
 }
