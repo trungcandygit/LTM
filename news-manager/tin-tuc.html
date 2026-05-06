@@ -9,11 +9,15 @@
   <style>
     .news-card { transition: transform .2s, box-shadow .2s; }
     .news-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.1); }
-    .card-img-top { height: 160px; object-fit: cover; }
+    .card-img-top { height: 160px; object-fit: cover; flex-shrink: 0; }
+    .card-title-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.8em; }
+    .card-excerpt { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: 4.2em; }
     .filter-chip { cursor: pointer; transition: all .15s; }
     .filter-chip.active { background: var(--tblr-primary); color: #fff; border-color: var(--tblr-primary); }
     #toast-container { position: fixed; bottom: 1rem; right: 1rem; z-index: 9999; width: 320px; }
     #result-panel { display: none; }
+    .modal-detail-img { width: 100%; max-height: 320px; object-fit: cover; border-radius: .5rem; }
+    .card-click-area { cursor: pointer; }
   </style>
 </head>
 <body class="antialiased">
@@ -167,6 +171,36 @@
   </div>
 </div>
 
+<!-- Modal xem chi tiết tin -->
+<div class="modal modal-blur fade" id="modalChiTiet" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <span id="detail-badge" class="badge mb-1"></span>
+          <h4 class="modal-title" id="detail-tieu-de"></h4>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <img id="detail-anh" src="" class="modal-detail-img mb-3"
+          onerror="this.style.display='none'">
+        <p id="detail-noi-dung" class="text-muted" style="white-space:pre-wrap;line-height:1.8"></p>
+      </div>
+      <div class="modal-footer">
+        <small class="text-muted me-auto">
+          <i class="ti ti-calendar-event me-1"></i>
+          <span id="detail-ngay"></span>
+        </small>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+        <button type="button" class="btn btn-primary" id="detail-btn-sua">
+          <i class="ti ti-edit me-1"></i>Sửa tin này
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast container -->
 <div id="toast-container"></div>
 
@@ -258,23 +292,26 @@ function renderNews(tins) {
     const color = loai.mauBadge || BADGE_COLOR[t.maLoai] || 'blue';
     const icon = loai.icon || ICON_MAP[t.maLoai] || 'news';
     const imgSrc = t.linkAnh || `https://picsum.photos/seed/${t.ma}/400/200`;
-    const excerpt = t.noiDung.length > 80 ? t.noiDung.substring(0,80) + '…' : t.noiDung;
     return `
     <div class="col-md-4" id="card-${t.ma}">
       <div class="card news-card h-100">
         <div class="ribbon ribbon-top ribbon-${color}">
           <i class="ti ti-${icon}"></i>
         </div>
-        <img src="${escHtml(imgSrc)}" class="card-img-top" alt="${escHtml(t.tieuDe)}"
-          onerror="this.src='https://picsum.photos/seed/${t.ma}/400/200'">
-        <div class="card-body d-flex flex-column">
-          <div class="mb-2">
-            <span class="badge bg-${color}-lt text-${color}">${escHtml(loai.ten)}</span>
-            <small class="text-muted ms-1">${t.ngayDang}</small>
+        <div class="card-click-area" onclick='moModalChiTiet(${JSON.stringify(t)})'>
+          <img src="${escHtml(imgSrc)}" class="card-img-top" alt="${escHtml(t.tieuDe)}"
+            onerror="this.src='https://picsum.photos/seed/${t.ma}/400/200'">
+          <div class="card-body pb-2">
+            <div class="mb-2">
+              <span class="badge bg-${color}-lt text-${color}">${escHtml(loai.ten)}</span>
+              <small class="text-muted ms-1">${t.ngayDang}</small>
+            </div>
+            <h4 class="card-title card-title-clamp">${escHtml(t.tieuDe)}</h4>
+            <p class="text-muted small card-excerpt">${escHtml(t.noiDung)}</p>
           </div>
-          <h4 class="card-title">${escHtml(t.tieuDe)}</h4>
-          <p class="text-muted small flex-grow-1">${escHtml(excerpt)}</p>
-          <div class="d-flex gap-2 mt-2">
+        </div>
+        <div class="card-footer bg-transparent pt-0 border-0">
+          <div class="d-flex gap-2">
             <button class="btn btn-sm btn-outline-primary flex-grow-1"
               onclick='moModalSua(${JSON.stringify(t)})'>
               <i class="ti ti-edit me-1"></i>Sửa
@@ -379,19 +416,22 @@ function updateCard(tin) {
   const color = loai.mauBadge || 'blue';
   const icon = loai.icon || 'news';
   const imgSrc = tin.linkAnh || `https://picsum.photos/seed/${tin.ma}/400/200`;
-  const excerpt = tin.noiDung.length > 80 ? tin.noiDung.substring(0,80) + '…' : tin.noiDung;
   cardCol.innerHTML = `
   <div class="card news-card h-100">
     <div class="ribbon ribbon-top ribbon-${color}"><i class="ti ti-${icon}"></i></div>
-    <img src="${escHtml(imgSrc)}" class="card-img-top" onerror="this.src='https://picsum.photos/seed/${tin.ma}/400/200'">
-    <div class="card-body d-flex flex-column">
-      <div class="mb-2">
-        <span class="badge bg-${color}-lt text-${color}">${escHtml(loai.ten)}</span>
-        <small class="text-muted ms-1">${tin.ngayDang}</small>
+    <div class="card-click-area" onclick='moModalChiTiet(${JSON.stringify(tin)})'>
+      <img src="${escHtml(imgSrc)}" class="card-img-top" onerror="this.src='https://picsum.photos/seed/${tin.ma}/400/200'">
+      <div class="card-body pb-2">
+        <div class="mb-2">
+          <span class="badge bg-${color}-lt text-${color}">${escHtml(loai.ten)}</span>
+          <small class="text-muted ms-1">${tin.ngayDang}</small>
+        </div>
+        <h4 class="card-title card-title-clamp">${escHtml(tin.tieuDe)}</h4>
+        <p class="text-muted small card-excerpt">${escHtml(tin.noiDung)}</p>
       </div>
-      <h4 class="card-title">${escHtml(tin.tieuDe)}</h4>
-      <p class="text-muted small flex-grow-1">${escHtml(excerpt)}</p>
-      <div class="d-flex gap-2 mt-2">
+    </div>
+    <div class="card-footer bg-transparent pt-0 border-0">
+      <div class="d-flex gap-2">
         <button class="btn btn-sm btn-outline-primary flex-grow-1" onclick='moModalSua(${JSON.stringify(tin)})'>
           <i class="ti ti-edit me-1"></i>Sửa
         </button>
@@ -442,6 +482,24 @@ document.getElementById('modalTin').addEventListener('show.bs.modal', function(e
   if (!e.relatedTarget) return; // opened programmatically (edit)
   moModalThem();
 });
+
+function moModalChiTiet(t) {
+  const loai = loaiMap[t.maLoai] || { ten: t.maLoai, mauBadge: 'blue' };
+  const color = loai.mauBadge || 'blue';
+  const imgSrc = t.linkAnh || `https://picsum.photos/seed/${t.ma}/400/200`;
+  document.getElementById('detail-badge').className = `badge bg-${color}-lt text-${color} mb-1`;
+  document.getElementById('detail-badge').textContent = loai.ten;
+  document.getElementById('detail-tieu-de').textContent = t.tieuDe;
+  document.getElementById('detail-noi-dung').textContent = t.noiDung;
+  document.getElementById('detail-anh').src = imgSrc;
+  document.getElementById('detail-anh').style.display = 'block';
+  document.getElementById('detail-ngay').textContent = t.ngayDang;
+  document.getElementById('detail-btn-sua').onclick = () => {
+    bootstrap.Modal.getInstance(document.getElementById('modalChiTiet')).hide();
+    moModalSua(t);
+  };
+  new bootstrap.Modal(document.getElementById('modalChiTiet')).show();
+}
 
 loadAll();
 </script>
