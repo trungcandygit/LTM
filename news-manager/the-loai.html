@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>NewsManager – Quản lý Thể loại</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/css/tabler.min.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.33.0/dist/tabler-icons.min.css"/>
+  <style>
+    #toast-container { position: fixed; bottom: 1rem; right: 1rem; z-index: 9999; width: 320px; }
+    #result-panel { display: none; }
+    .icon-preview { font-size: 1.2rem; }
+  </style>
+</head>
+<body class="antialiased">
+<div class="wrapper">
+  <!-- Sidebar -->
+  <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
+    <div class="container-fluid">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <h1 class="navbar-brand navbar-brand-autodark">
+        <a href="index.html" class="d-flex align-items-center gap-2 text-decoration-none text-white">
+          <i class="ti ti-news fs-2"></i>
+          <span style="font-weight:700;font-size:1.2rem">NewsManager</span>
+        </a>
+      </h1>
+      <div class="collapse navbar-collapse" id="navbar-menu">
+        <ul class="navbar-nav pt-lg-3">
+          <li class="nav-item">
+            <a class="nav-link" href="index.html">
+              <span class="nav-link-icon"><i class="ti ti-dashboard"></i></span>
+              <span class="nav-link-title">Dashboard</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="tin-tuc.html">
+              <span class="nav-link-icon"><i class="ti ti-news"></i></span>
+              <span class="nav-link-title">Tin tức</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link active" href="the-loai.html">
+              <span class="nav-link-icon"><i class="ti ti-category"></i></span>
+              <span class="nav-link-title">Thể loại</span>
+            </a>
+          </li>
+        </ul>
+        <div class="mt-auto pb-3">
+          <div class="d-flex align-items-center gap-2 px-3">
+            <span class="avatar avatar-sm bg-blue text-white"><i class="ti ti-server"></i></span>
+            <div>
+              <div class="small fw-bold text-white">UDP Server</div>
+              <span class="badge bg-green-lt" style="font-size:.7rem">:9999</span>
+              <span class="badge bg-lime" style="font-size:.7rem">● Online</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="page-wrapper">
+    <div class="page-header d-print-none">
+      <div class="container-xl">
+        <div class="row g-2 align-items-center">
+          <div class="col">
+            <h2 class="page-title">Quản lý Thể loại</h2>
+          </div>
+          <div class="col-auto">
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalLoai" onclick="moModalThem()">
+              <i class="ti ti-plus me-1"></i> Thêm thể loại
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="container-xl">
+        <!-- Result panel (yêu cầu BTL) -->
+        <div id="result-panel" class="alert alert-success alert-dismissible mb-3">
+          <div class="d-flex">
+            <i class="ti ti-check me-2 mt-1"></i>
+            <div>
+              <h4 class="alert-title mb-1">Cập nhật thể loại thành công</h4>
+              <pre id="result-json" class="mb-0 small" style="white-space:pre-wrap"></pre>
+            </div>
+          </div>
+          <button type="button" class="btn-close" onclick="document.getElementById('result-panel').style.display='none'"></button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Danh sách thể loại tin</div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+              <thead>
+                <tr>
+                  <th>Mã</th>
+                  <th>Tên loại</th>
+                  <th>Badge màu</th>
+                  <th>Icon</th>
+                  <th class="text-center">Số tin</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody id="loai-tbody">
+                <tr>
+                  <td colspan="6" class="text-center text-muted py-4">
+                    <div class="spinner-border spinner-border-sm me-2"></div>Đang tải...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Thêm/Sửa thể loại -->
+<div class="modal modal-blur fade" id="modalLoai" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalLoaiTitle">Thêm thể loại</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label required">Mã thể loại</label>
+          <input type="text" id="loai-ma" class="form-control" placeholder="VD: CN, TT..." maxlength="10">
+          <div class="form-text">Không thay đổi được sau khi tạo</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label required">Tên thể loại</label>
+          <input type="text" id="loai-ten" class="form-control" placeholder="VD: Công nghệ">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Icon (Tabler icon name)</label>
+          <input type="text" id="loai-icon" class="form-control" placeholder="VD: laptop, news, star">
+          <div class="form-text">Xem icons tại <a href="https://tabler.io/icons" target="_blank">tabler.io/icons</a></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Màu badge</label>
+          <select id="loai-mau" class="form-select">
+            <option value="blue">Blue</option>
+            <option value="green">Green</option>
+            <option value="yellow">Yellow</option>
+            <option value="red">Red</option>
+            <option value="purple">Purple</option>
+            <option value="orange">Orange</option>
+            <option value="cyan">Cyan</option>
+            <option value="pink">Pink</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+        <button type="button" class="btn btn-primary" onclick="luuLoai()">
+          <i class="ti ti-device-floppy me-1"></i> Lưu
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/js/tabler.min.js"></script>
+<script>
+const API = 'http://localhost:8080';
+
+let loais = [];
+let tins = [];
+let editingMa = null;
+
+function escHtml(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function loadAll() {
+  try {
+    const [loaiRes, tinRes] = await Promise.all([
+      fetch(API + '/api/loai'),
+      fetch(API + '/api/tin')
+    ]);
+    loais = await loaiRes.json();
+    tins = await tinRes.json();
+    renderTable();
+  } catch (e) {
+    document.getElementById('loai-tbody').innerHTML =
+      `<tr><td colspan="6"><div class="alert alert-danger m-2">
+        <i class="ti ti-alert-circle me-2"></i>Không kết nối được server.
+      </div></td></tr>`;
+  }
+}
+
+function countTin(ma) {
+  return tins.filter(t => t.maLoai === ma).length;
+}
+
+function renderTable() {
+  if (!loais.length) {
+    document.getElementById('loai-tbody').innerHTML =
+      '<tr><td colspan="6" class="text-center text-muted py-4">Chưa có thể loại nào</td></tr>';
+    return;
+  }
+  document.getElementById('loai-tbody').innerHTML = loais.map(l => {
+    const color = l.mauBadge || 'blue';
+    const icon = l.icon || 'tag';
+    const soTin = countTin(l.ma);
+    return `
+    <tr id="row-${l.ma}">
+      <td><span class="badge bg-secondary-lt">${escHtml(l.ma)}</span></td>
+      <td class="fw-medium">${escHtml(l.ten)}</td>
+      <td><span class="badge bg-${color}">${color}</span></td>
+      <td><i class="ti ti-${icon} me-1 icon-preview"></i><code>${escHtml(icon)}</code></td>
+      <td class="text-center">
+        <span class="badge ${soTin > 0 ? 'bg-blue-lt text-blue' : 'bg-muted-lt text-muted'}">${soTin}</span>
+      </td>
+      <td>
+        <div class="btn-list flex-nowrap">
+          <button class="btn btn-sm btn-outline-primary" onclick='moModalSua(${JSON.stringify(l)})'>
+            <i class="ti ti-edit me-1"></i>Sửa
+          </button>
+          <button class="btn btn-sm btn-outline-danger" onclick="xoaLoai('${l.ma}', ${soTin})">
+            <i class="ti ti-trash me-1"></i>Xóa
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function moModalThem() {
+  editingMa = null;
+  document.getElementById('modalLoaiTitle').textContent = 'Thêm thể loại mới';
+  document.getElementById('loai-ma').value = '';
+  document.getElementById('loai-ma').disabled = false;
+  document.getElementById('loai-ten').value = '';
+  document.getElementById('loai-icon').value = '';
+  document.getElementById('loai-mau').value = 'blue';
+}
+
+function moModalSua(loai) {
+  editingMa = loai.ma;
+  document.getElementById('modalLoaiTitle').textContent = 'Sửa thể loại';
+  document.getElementById('loai-ma').value = loai.ma;
+  document.getElementById('loai-ma').disabled = true;
+  document.getElementById('loai-ten').value = loai.ten;
+  document.getElementById('loai-icon').value = loai.icon || '';
+  document.getElementById('loai-mau').value = loai.mauBadge || 'blue';
+  const modal = new bootstrap.Modal(document.getElementById('modalLoai'));
+  modal.show();
+}
+
+async function luuLoai() {
+  const ma = editingMa || document.getElementById('loai-ma').value.trim().toUpperCase();
+  const ten = document.getElementById('loai-ten').value.trim();
+  const icon = document.getElementById('loai-icon').value.trim() || 'tag';
+  const mauBadge = document.getElementById('loai-mau').value;
+
+  if (!ma || !ten) {
+    showToast('Vui lòng điền đầy đủ mã và tên thể loại!', 'danger');
+    return;
+  }
+
+  try {
+    let res, data;
+    if (editingMa) {
+      res = await fetch(API + '/api/loai/' + editingMa, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ten, icon, mauBadge })
+      });
+    } else {
+      res = await fetch(API + '/api/loai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ma, ten, icon, mauBadge })
+      });
+    }
+    data = await res.json();
+    if (data.error) { showToast(data.error, 'danger'); return; }
+
+    bootstrap.Modal.getInstance(document.getElementById('modalLoai')).hide();
+
+    if (editingMa) {
+      const idx = loais.findIndex(l => l.ma === editingMa);
+      if (idx >= 0) loais[idx] = data;
+      updateRow(data);
+      showToast('Đã cập nhật thể loại thành công!', 'success');
+      showResultPanel(data);
+    } else {
+      loais.push(data);
+      renderTable();
+      showToast('Đã thêm thể loại thành công!', 'success');
+    }
+  } catch (e) {
+    showToast('Lỗi: ' + e.message, 'danger');
+  }
+}
+
+function updateRow(l) {
+  const row = document.getElementById('row-' + l.ma);
+  if (!row) { renderTable(); return; }
+  const color = l.mauBadge || 'blue';
+  const icon = l.icon || 'tag';
+  const soTin = countTin(l.ma);
+  row.innerHTML = `
+    <td><span class="badge bg-secondary-lt">${escHtml(l.ma)}</span></td>
+    <td class="fw-medium">${escHtml(l.ten)}</td>
+    <td><span class="badge bg-${color}">${color}</span></td>
+    <td><i class="ti ti-${icon} me-1 icon-preview"></i><code>${escHtml(icon)}</code></td>
+    <td class="text-center">
+      <span class="badge ${soTin > 0 ? 'bg-blue-lt text-blue' : 'bg-muted-lt text-muted'}">${soTin}</span>
+    </td>
+    <td>
+      <div class="btn-list flex-nowrap">
+        <button class="btn btn-sm btn-outline-primary" onclick='moModalSua(${JSON.stringify(l)})'>
+          <i class="ti ti-edit me-1"></i>Sửa
+        </button>
+        <button class="btn btn-sm btn-outline-danger" onclick="xoaLoai('${l.ma}', ${soTin})">
+          <i class="ti ti-trash me-1"></i>Xóa
+        </button>
+      </div>
+    </td>`;
+}
+
+async function xoaLoai(ma, soTin) {
+  if (soTin > 0) {
+    showAlert(`Không thể xóa thể loại "<strong>${escHtml(ma)}</strong>" vì còn <strong>${soTin} tin</strong> thuộc loại này!`);
+    return;
+  }
+  if (!confirm(`Xóa thể loại "${ma}"?`)) return;
+  try {
+    const res = await fetch(API + '/api/loai/' + ma, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.error) { showToast(data.error, 'danger'); return; }
+    loais = loais.filter(l => l.ma !== ma);
+    renderTable();
+    showToast('Đã xóa thể loại!', 'success');
+  } catch (e) {
+    showToast('Lỗi: ' + e.message, 'danger');
+  }
+}
+
+function showAlert(msg) {
+  const existing = document.getElementById('danger-alert');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'danger-alert';
+  div.className = 'alert alert-danger alert-dismissible mb-3';
+  div.innerHTML = `<i class="ti ti-alert-triangle me-2"></i>${msg}
+    <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>`;
+  document.querySelector('.page-body .container-xl').prepend(div);
+  setTimeout(() => { if (div.parentElement) div.remove(); }, 5000);
+}
+
+function showResultPanel(data) {
+  const panel = document.getElementById('result-panel');
+  document.getElementById('result-json').textContent = JSON.stringify(data, null, 2);
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showToast(msg, type = 'success') {
+  const id = 'toast-' + Date.now();
+  const icon = type === 'success' ? 'check' : 'alert-circle';
+  const html = `
+  <div id="${id}" class="toast show align-items-center text-bg-${type} border-0 mb-2" role="alert">
+    <div class="d-flex">
+      <div class="toast-body"><i class="ti ti-${icon} me-2"></i>${escHtml(msg)}</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="document.getElementById('${id}').remove()"></button>
+    </div>
+  </div>`;
+  document.getElementById('toast-container').insertAdjacentHTML('beforeend', html);
+  setTimeout(() => { const el = document.getElementById(id); if (el) el.remove(); }, 4000);
+}
+
+loadAll();
+</script>
+</body>
+</html>
