@@ -169,12 +169,12 @@
         <!-- News grid -->
         <div class="row mb-3 align-items-center">
           <div class="col">
-            <h3 class="mb-0">Tin tức mới nhất</h3>
+            <h3 class="mb-0">Tin tức mới nhất <span id="tin-count" class="text-muted fs-5"></span></h3>
           </div>
           <div class="col-auto">
-            <a href="tin-tuc.html" class="btn btn-sm btn-primary">
-              <i class="ti ti-arrow-right me-1"></i> Xem tất cả
-            </a>
+            <button id="btn-xem-tat-ca" class="btn btn-sm btn-primary" onclick="toggleXemTatCa()">
+              <i class="ti ti-chevrons-down me-1"></i> Xem tất cả
+            </button>
           </div>
         </div>
 
@@ -236,6 +236,22 @@ const BADGE_COLOR = { CN:'blue', TT:'green', KT:'yellow', GT:'red' };
 const ICON_MAP = { CN:'laptop', TT:'ball-football', KT:'trending-up', GT:'device-tv' };
 
 let loaiMap = {};
+let allTins = [];
+let showAll = false;
+
+function toggleXemTatCa() {
+  showAll = !showAll;
+  const btn = document.getElementById('btn-xem-tat-ca');
+  if (showAll) {
+    btn.innerHTML = '<i class="ti ti-chevrons-up me-1"></i> Thu gọn';
+    btn.classList.replace('btn-primary', 'btn-secondary');
+    renderNews(allTins);
+  } else {
+    btn.innerHTML = '<i class="ti ti-chevrons-down me-1"></i> Xem tất cả';
+    btn.classList.replace('btn-secondary', 'btn-primary');
+    renderNews(allTins.slice(0, 6));
+  }
+}
 
 function clock() {
   const now = new Date();
@@ -250,19 +266,20 @@ async function loadAll() {
       fetch(API + '/api/tin'),
       fetch(API + '/api/loai')
     ]);
-    const tins = await tinRes.json();
+    allTins = await tinRes.json();
     const loais = await loaiRes.json();
 
     loais.forEach(l => loaiMap[l.ma] = l);
 
     const today = new Date().toISOString().slice(0, 10);
-    const todayCount = tins.filter(t => t.ngayDang === today).length;
+    const todayCount = allTins.filter(t => t.ngayDang === today).length;
 
-    document.getElementById('stat-total').textContent = tins.length + ' bài viết';
+    document.getElementById('stat-total').textContent = allTins.length + ' bài viết';
     document.getElementById('stat-loai').textContent = loais.length + ' danh mục';
     document.getElementById('stat-today').textContent = todayCount + ' bài viết';
+    document.getElementById('tin-count').textContent = allTins.length > 6 ? `(đang hiện 6/${allTins.length})` : '';
 
-    renderNews(tins.slice(0, 6));
+    renderNews(allTins.slice(0, 6));
   } catch (e) {
     document.getElementById('news-grid').innerHTML =
       `<div class="col-12"><div class="alert alert-danger">
