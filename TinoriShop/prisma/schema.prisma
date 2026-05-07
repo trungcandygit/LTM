@@ -1,0 +1,140 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+  output          = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider  = "sqlite"
+  url       = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  image     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String           @id @default(cuid())
+  name        String
+  slug        String           @unique
+  description String?
+  price       Float
+  salePrice   Float?
+  stock       Int              @default(0)
+  featured    Boolean          @default(false)
+  active      Boolean          @default(true)
+  categoryId  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  category    Category?        @relation(fields: [categoryId], references: [id])
+  images      ProductImage[]
+  variants    ProductVariant[]
+  orderItems  OrderItem[]
+
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  url       String
+  alt       String?
+  isPrimary Boolean @default(false)
+  order     Int     @default(0)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id         String      @id @default(cuid())
+  name       String
+  value      String
+  type       String
+  stock      Int         @default(0)
+  price      Float?
+  salePrice  Float?
+  active     Boolean     @default(true)
+  image      String?
+  productId  String
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@map("product_variants")
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  code            String      @unique
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  province        String
+  district        String
+  ward            String
+  detailedAddress String
+  note            String?
+  subtotal        Float
+  shippingFee     Float       @default(0)
+  depositAmount   Float       @default(25000)
+  totalAmount     Float
+  status          String      @default("PENDING_DEPOSIT")
+  depositStatus   String      @default("PENDING")
+  depositPaidAt   DateTime?
+  depositNote     String?
+  depositImage    String?
+  paymentMethod   String      @default("BANK_TRANSFER")
+  shippingCode    String?
+  shippingLink    String?
+  reminderSentAt  DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  items           OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String          @id @default(cuid())
+  quantity  Int
+  price     Float
+  orderId   String
+  productId String
+  variantId String?
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id])
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@map("order_items")
+}
+
+model PageVisit {
+  id        String   @id @default(cuid())
+  path      String
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("page_visits")
+}
