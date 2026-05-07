@@ -33,7 +33,7 @@ CREATE TABLE "products" (
     "categoryId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "products_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "products_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories" ("id") ON DELETE SET NULL
 );
 
 -- CreateTable
@@ -44,7 +44,7 @@ CREATE TABLE "product_images" (
     "isPrimary" BOOLEAN NOT NULL DEFAULT false,
     "order" INTEGER NOT NULL DEFAULT 0,
     "productId" TEXT NOT NULL,
-    CONSTRAINT "product_images_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "product_images_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE CASCADE
 );
 
 -- CreateTable
@@ -55,8 +55,11 @@ CREATE TABLE "product_variants" (
     "type" TEXT NOT NULL,
     "stock" INTEGER NOT NULL DEFAULT 0,
     "price" REAL,
+    "salePrice" REAL,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "image" TEXT,
     "productId" TEXT NOT NULL,
-    CONSTRAINT "product_variants_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "product_variants_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE CASCADE
 );
 
 -- CreateTable
@@ -72,14 +75,19 @@ CREATE TABLE "orders" (
     "detailedAddress" TEXT NOT NULL,
     "note" TEXT,
     "subtotal" REAL NOT NULL,
+    "shippingFee" REAL NOT NULL DEFAULT 0,
     "depositAmount" REAL NOT NULL DEFAULT 25000,
     "totalAmount" REAL NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'PENDING_DEPOSIT',
     "depositStatus" TEXT NOT NULL DEFAULT 'PENDING',
     "depositPaidAt" DATETIME,
     "depositNote" TEXT,
+    "depositImage" TEXT,
     "paymentMethod" TEXT NOT NULL DEFAULT 'BANK_TRANSFER',
     "shippingCode" TEXT,
+    "shippingLink" TEXT,
+    "reminderSentAt" DATETIME,
+    "cancelledAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
@@ -92,9 +100,18 @@ CREATE TABLE "order_items" (
     "orderId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "variantId" TEXT,
-    CONSTRAINT "order_items_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "order_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "order_items_variantId_fkey" FOREIGN KEY ("variantId") REFERENCES "product_variants" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "order_items_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders" ("id") ON DELETE CASCADE,
+    CONSTRAINT "order_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT,
+    CONSTRAINT "order_items_variantId_fkey" FOREIGN KEY ("variantId") REFERENCES "product_variants" ("id") ON DELETE SET NULL
+);
+
+-- CreateTable
+CREATE TABLE "page_visits" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "path" TEXT NOT NULL,
+    "ip" TEXT,
+    "userAgent" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateIndex
